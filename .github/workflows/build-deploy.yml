@@ -64,7 +64,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io/Michela877
+          registry: ghcr.io/michela877
           username: ${{ github.actor }}
           password: ${{ secrets.GITOPS_TOKEN }}
 
@@ -75,7 +75,7 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }},ghcr.io/Michela877/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
+          tags: ghcr.io/michela877/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }},ghcr.io/michela877/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
 
 #      CONTINUOUS DEPLOYMENT (FLUXCD)
 
@@ -95,7 +95,7 @@ jobs:
       - name: Update deployment.yaml with new tag
         run: |
           new_tag=${{ steps.tag_version.outputs.new_tag }}
-          sed -i "s|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" test-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml
+          sed -i "s|image: ghcr.io/michela877/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/michela877/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" test-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml
           cd test-gitops
           git add apps/${{ env.REPO_NAME }}/deployment.yaml
           git commit -m "Update ${{ env.IMAGE_NAME }} image tag to ${new_tag} [ci skip]" || echo "No changes"
