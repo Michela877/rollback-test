@@ -69,7 +69,7 @@ jobs:
       - name: Update deployment.yaml with new tag
         run: |
           new_tag=${{ steps.tag_version.outputs.new_tag }}
-          DEPLOY_FILE="asv-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml"
+          DEPLOY_FILE="apps/${{ env.REPO_NAME }}/deployment.yaml"
           
           sed -i "s|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" "$DEPLOY_FILE"
 
