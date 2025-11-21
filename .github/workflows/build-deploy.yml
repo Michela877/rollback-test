@@ -1,40 +1,70 @@
-name: Build and Deploy Image to Develop environment
+name: Build and Deploy Image to main environment
 
 on:
-  workflow_dispatch:
+ push:
+    branches: [main]
+ workflow_dispatch:
 
 env:
-  IMAGE_NAME: asv-rollback-test-prod
-  REPO_NAME: asv-rollback-test
+  IMAGE_NAME: rollback-test-main
+  REPO_NAME: rollback-test
 
 jobs:
   versioning-build-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # CHECKOUT DEL CODICE
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      # ---- VERSIONING ----
-      - name: Get next tag version
+      - name: Configure Git
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+      - name: Calculate next version
         id: tag_version
         run: |
-          last_tag=$(git describe --tags --abbrev=0 || echo "0.0.0")
-          echo "Last tag: $last_tag"
-          IFS='.' read -r major minor patch <<< "$last_tag"
-          new_tag="$major.$minor.$((patch+1))"
-          echo "new_tag=$new_tag"
+          latest_tag=$(git tag -l '0.0.*' --sort=-v:refname | head -n 1)
+          
+          if [ -z "$latest_tag" ]; then
+            new_tag="0.0.1"
+            echo "No existing tags found, starting with $new_tag"
+          else
+            echo "Latest tag found: $latest_tag"
+            IFS='.' read -r -a version_parts <<< "${latest_tag#v}"
+            patch=${version_parts[2]}
+            new_patch=$((patch + 1))
+            new_tag="0.0.$new_patch"
+            echo "Next tag will be: $new_tag"
+          fi
+          
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
 
-      # ---- BUILD DOCKER ----
+      - name: Create and push new tag
+        run: |
+          new_tag=${{ steps.tag_version.outputs.new_tag }}
+          echo "Creating tag: $new_tag"
+          
+          if git rev-parse "$new_tag" >/dev/null 2>&1; then
+            echo "ERROR: Tag $new_tag already exists!"
+            exit 1
+          else
+            git tag "$new_tag"
+            git push origin "$new_tag"
+            echo "Successfully created and pushed tag $new_tag"
+          fi
+
+#      BUILD DOCKER
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ghcr.io/Michela877
           username: ${{ github.actor }}
           password: ${{ secrets.GITOPS_TOKEN }}
 
@@ -45,18 +75,16 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }}
-            ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
+          tags: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }},ghcr.io/Michela877/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
 
-      # ---- CONTINUOUS DEPLOYMENT (FLUXCD) ----
+#      CONTINUOUS DEPLOYMENT (FLUXCD)
 
       - name: Checkout GitOps repo
         uses: actions/checkout@v3
         with:
-          repository: assolombarda-it/asv-gitops
+          repository: Michela877/test-gitops
           token: ${{ secrets.GITOPS_TOKEN }}
-          path: asv-gitops
+          path: test-gitops
           ref: ${{ github.ref_name }}
 
       - name: Configure Git
@@ -67,11 +95,8 @@ jobs:
       - name: Update deployment.yaml with new tag
         run: |
           new_tag=${{ steps.tag_version.outputs.new_tag }}
-          DEPLOY_FILE="asv-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml"
-          
-          sed -i "s|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" "$DEPLOY_FILE"
-
-          cd asv-gitops
-          git add "$DEPLOY_FILE"
-          git commit -m "Update ${{ env.IMAGE_NAME }} image tag to ${new_tag}-${{ github.ref_name }} [ci skip]" || echo "No changes"
+          sed -i "s|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" test-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml
+          cd test-gitops
+          git add apps/${{ env.REPO_NAME }}/deployment.yaml
+          git commit -m "Update ${{ env.IMAGE_NAME }} image tag to ${new_tag} [ci skip]" || echo "No changes"
           git push origin ${{ github.ref_name }}
