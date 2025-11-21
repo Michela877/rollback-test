@@ -1,10 +1,12 @@
 name: Build and Deploy Image to Develop environment
 
 on:
-  workflow_dispatch:
+ push:
+    branches: [develop]
+ workflow_dispatch:
 
 env:
-  IMAGE_NAME: asv-rollback-test-prod
+  IMAGE_NAME: asv-rollback-test-dev
   REPO_NAME: asv-rollback-test
 
 jobs:
@@ -75,3 +77,4 @@ jobs:
           git add "$DEPLOY_FILE"
           git commit -m "Update ${{ env.IMAGE_NAME }} image tag to ${new_tag}-${{ github.ref_name }} [ci skip]" || echo "No changes"
           git push origin ${{ github.ref_name }}
+ 
