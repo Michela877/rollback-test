@@ -1,4 +1,4 @@
-name: Build and Deploy Image to Develop environment
+name: Build and Deploy Image to develop environment
 
 on:
  push:
@@ -6,8 +6,8 @@ on:
  workflow_dispatch:
 
 env:
-  IMAGE_NAME: asv-rollback-test-dev
-  REPO_NAME: asv-rollback-test
+  IMAGE_NAME: rollback-test-develop
+  REPO_NAME: rollback-test
 
 jobs:
   versioning-build-deploy:
@@ -64,7 +64,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io/assolombarda-it
+          registry: ghcr.io/Michela877
           username: ${{ github.actor }}
           password: ${{ secrets.GITOPS_TOKEN }}
 
@@ -75,16 +75,16 @@ jobs:
           file: ./Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }},ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
+          tags: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${{ steps.tag_version.outputs.new_tag }}-${{ github.ref_name }},ghcr.io/Michela877/${{ env.IMAGE_NAME }}:latest-${{ github.ref_name }}
 
 #      CONTINUOUS DEPLOYMENT (FLUXCD)
 
       - name: Checkout GitOps repo
         uses: actions/checkout@v3
         with:
-          repository: assolombarda-it/asv-gitops
+          repository: Michela877/test-gitops
           token: ${{ secrets.GITOPS_TOKEN }}
-          path: asv-gitops
+          path: test-gitops
           ref: ${{ github.ref_name }}
 
       - name: Configure Git
@@ -95,8 +95,8 @@ jobs:
       - name: Update deployment.yaml with new tag
         run: |
           new_tag=${{ steps.tag_version.outputs.new_tag }}
-          sed -i "s|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/assolombarda-it/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" asv-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml
-          cd asv-gitops
+          sed -i "s|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:.*|image: ghcr.io/Michela877/${{ env.IMAGE_NAME }}:${new_tag}-${{ github.ref_name }}|" test-gitops/apps/${{ env.REPO_NAME }}/deployment.yaml
+          cd test-gitops
           git add apps/${{ env.REPO_NAME }}/deployment.yaml
           git commit -m "Update ${{ env.IMAGE_NAME }} image tag to ${new_tag} [ci skip]" || echo "No changes"
           git push origin ${{ github.ref_name }}
